@@ -1,5 +1,4 @@
 from auction.scraper.developmentaid_scraper import DevelopmentAidScraper
-from auction.scraper.fundsforngos_scraper import FundsForNGOScraper
 from auction.models import UserPreference, Auction
 
 def run_scrapers():
@@ -11,7 +10,7 @@ def run_scrapers():
     keywords = [preference.keyword for preference in user_preferences]
     
     # Initialize scrapers
-    scrapers = [DevelopmentAidScraper(), FundsForNGOScraper()]  # Add other scrapers here if necessary
+    scrapers = [DevelopmentAidScraper()]  # Add other scrapers here if necessary
     all_auctions = []
 
     for keyword in keywords:
