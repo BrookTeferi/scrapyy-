@@ -5,6 +5,7 @@ __pycache__/
 venv/
 *.sqlite3
 
+downloaded_images
 
 # Environment files
 .env

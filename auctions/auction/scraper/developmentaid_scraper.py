@@ -1,175 +1,306 @@
-from typing import cast
+from time import sleep
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-from time import sleep
-from datetime import datetime
-from auction.models import Auction, auction_details
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
+import requests
+from auction.models import Auction, auction_details
+import json
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 class DevelopmentAidScraper:
-   
     def __init__(self, url, keyword):
         self.url = url
         self.keyword = keyword
- 
+        self.image_folder = 'downloaded_images' 
+
+        if not os.path.exists(self.image_folder):
+            os.makedirs(self.image_folder)
+
     def fetch_data(self):
-        # Set up Selenium with Chrome options
+       
         chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Run browser in headless mode
+        chrome_options.add_argument("--headless") 
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-        # Use the keyword variable in the URL
+    
         url_with_keyword = f'{self.url}?sort=relevance.desc&searchedText={self.keyword}'
         driver.get(url_with_keyword)
-        sleep(5)  # Wait for JavaScript to load
-
+        sleep(5)
+        auction_count = 0
         grants = driver.find_elements(By.CSS_SELECTOR, 'da-search-card.ng-star-inserted')
-        grant_data = []
-        url = None
+
         for grant in grants:
-            title_element = grant.find_element(By.CSS_SELECTOR, '.search-card__title')
-            title = title_element.text if title_element else None
+            grant_info = self.extract_grant_info(grant)
+            if grant_info:
+                title, deadline, url, image_url = grant_info
+                image_path = self.download_image(image_url, title) if image_url else None
+                auction_id = self.save_to_database(title, deadline, url, image_path)
 
-            deadline_element = grant.find_element(By.CSS_SELECTOR, '.ng-star-inserted')
-            deadline = deadline_element.text if deadline_element else None
+                auction_count += 1  # Increment the counter
 
-            url = title_element.get_attribute('href') if title_element else None
+                # Save to the database after every 30 auctions
+                if auction_count >= 30:
+                    print(f"Saving data after scraping {auction_count} auctions...")
+                    auction_count = 0  # Reset the counter after saving
+            
+        driver.quit()
 
-            grant_data.append({
-                'title': title,
+    def extract_grant_info(self, grant):
+       
+        title_element = grant.find_element(By.CSS_SELECTOR, '.search-card__title')
+        title = title_element.text if title_element else None
+       
+        deadline_element = grant.find_element(By.XPATH, ".//div[@class='details-container search-card__funding-md-column']//span[text()='Application deadline:']/following-sibling::span")
+        deadline_str = deadline_element.text if deadline_element else None
+
+        deadline = None
+        if deadline_str:
+            try:
+                deadline = datetime.strptime(deadline_str, '%b %d, %Y').date()  # Format: Jan 15, 2025
+            except ValueError:
+                print(f"Error parsing deadline: {deadline_str}")
+                deadline = None
+        url = title_element.get_attribute('href') if title_element else None
+
+        image_element = grant.find_element(By.CSS_SELECTOR, '.search-card__avatar img')
+        image_url = image_element.get_attribute('src') if image_element else None
+
+        return title, deadline, url, image_url
+
+    def download_image(self, image_url, title):
+
+        filename = f"{title[:50].replace(' ', '_').replace('/', '_')}.jpg"
+        image_path = os.path.join(self.image_folder, filename)
+        try:
+            response = requests.get(image_url, stream=True)
+            if response.status_code == 200:
+                with open(image_path, 'wb') as file:
+                    for chunk in response.iter_content(1024):
+                        file.write(chunk)
+                print(f"Downloaded image for '{title}' at {image_path}")
+                return image_path
+            else:
+                print(f"Failed to download image for '{title}' from {image_url}")
+        except Exception as e:
+            print(f"Error downloading image for '{title}': {e}")
+        
+        return None
+
+    def save_to_database(self, title, deadline, url, image_path):
+        auction, created = Auction.objects.get_or_create(
+            title=title,
+            defaults={
                 'deadline': deadline,
                 'url': url,
-                'source': "DevelopmentAid"
-            })
+                'image_path': image_path,
+                'source': 'DevelopmentAid'
+            }
+        )
+        if not created:
+            auction.deadline = deadline
+            auction.url = url
+            auction.image_path = image_path
+            auction.save()
 
-        driver.quit()  # Close the browser
-        return grant_data, url
+        print(f"Saved auction: {title}, {deadline}, {url}, Image path: {image_path}")
+        return auction.id 
 
-    def fetch_detailed_info(self, url):
-        grants, detail_url = self.fetch_data()
-        print(detail_url)
-        # Set up Selenium with Chrome options
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument('--ignore-certificate-errors')
-        chrome_options.add_argument('--ignore-ssl-errors')
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-        url_str = cast(str, detail_url)
-        driver.get(url_str)
-    
-        sleep(5)  # Allow time for page to load
-       
-        # Extract the text content from each element
-        details_container = driver.find_element(By.CLASS_NAME, "default-details")
-        Location = details_container.find_element(By.CSS_SELECTOR, "span:nth-child(2)").text.strip()
-        print(f'Location:{Location}')
+    def fetch_auction_detail_scraper(self, url, auction_id):
+        auctions = Auction.objects.all()
+        
+        for auction in auctions:
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument('--ignore-certificate-errors')
+            chrome_options.add_argument('--ignore-ssl-errors')
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        
+            if auction_details.objects.filter(auction_id=auction.id).exists():
+                print(f"Auction {auction.id} already has details.")
+            else:
+                print(f"Fetching details for Auction {auction.id}")
+                auction_url = auction.url
 
-        funding_agency = driver.find_element(By.CLASS_NAME, "funding-agency")
-        sleep(2)
-        # Step 2: Locate the span inside the div by class name
-        donor_name = funding_agency.find_element(By.CLASS_NAME, "donor-name")
-        sleep(3)
-        # Step 3: Locate the 'a' tag inside the span and extract its text
-        donor_link = donor_name.find_element(By.TAG_NAME, "a")
-        text = donor_link.text
-        sleep(2)
-
-        # Print the extracted text
-        print(f"Funding agency: {text}")
-
-        try:
+                print(f"auction_url:{auction_url}")
             
-            a_tags = driver.find_elements(By.CLASS_NAME, "view-link")
-            sleep(5)
-            # Access the second <a> tag (index 1, since indexing starts from 0)
-            second_a_tag = a_tags[1]  # Ensure there are at least two elements to avoid IndexError
-            sleep(3)
-            Contracting_authority_text = second_a_tag.text.strip()
-            sleep(3)
-            Contracting_authority_link = second_a_tag.get_attribute("href")
-            sleep(4)
-
-            # Print the extracted information
-            print(f"Text: {Contracting_authority_text}")
-            print(f"Link: {Contracting_authority_link}")
-        except Exception as e:
-            print(f"Error: {e}")   
-
-        try:
-            value_element = driver.find_element(By.XPATH, "//span[text()='Contracting authority type:']/following-sibling::span")
-
-            # Extract the text content
-            contracting_authority_type = value_element.text.strip()
-
-            # Print the result
-            print(f"Value: {contracting_authority_type}")
-        except Exception as e:
-            print(f"Error: {e}")
-        sleep(5)
-            # Locate the advanced-details div
-        parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
-
-        # List of labels for the elements to extract
-        labels = [
-            "Status", "Budjet", "Award Ceiling", "Award Floor", 
-            "Sector", "Languages", "Eligible Applicants", 
-            "Eligible Citizenships", "Date Posted"
-        ]
-
-        # Loop through the child divs and fetch the second span's text
-        for index, label in enumerate(labels):
-            try:
-                inner_div = parent_div.find_elements(By.TAG_NAME, "div")[index]
-                spans = inner_div.find_elements(By.TAG_NAME, "span")
-                if len(spans) > 1:
-                    text = spans[1].get_attribute('textContent')
-                    print(f"{label} TextContent: {text}")
-                else:
-                    print(f"{label}: Span not found!")
-            except Exception as e:
-                print(f"Error processing {label}: {str(e)}")
+                driver.get(auction_url)
+                sleep(5)
             
-            # Add sleep only if necessary, based on real-world requirements
-            sleep(2)
-
+                details_container = driver.find_element(By.CLASS_NAME, "default-details")
                 
-        driver.quit()
-        # return detailed_data
+                location = details_container.find_element(By.CSS_SELECTOR, "span:nth-child(2)").text.strip()
+                print(f"Location:{location}")
+                sleep(3) 
+                funding_agency = driver.find_element(By.CLASS_NAME, "funding-agency")
+               
+                donor_name = funding_agency.find_element(By.CLASS_NAME, "donor-name")
+                donor_link = donor_name.find_element(By.TAG_NAME, "a").text.strip()
+                print(f"funding_agency:{donor_link}")
+                sleep(5) 
+                try:
+                    a_tags = driver.find_elements(By.CLASS_NAME, "view-link")
+                    second_a_tag = a_tags[1]
+                    contracting_authority_text = second_a_tag.text.strip()
+                    contracting_authority_link = second_a_tag.get_attribute("href")
+                    print(f"contracting_authority_text:{contracting_authority_text}")
+                    print(f"contracting_authority_link:{contracting_authority_link}")
+                except Exception as e:
+                    contracting_authority_text = contracting_authority_link = None
 
-    def save_to_database(self, scraped_data):
-        for data in scraped_data:
-            # Handle deadline if empty
-            deadline = None
-            if data['deadline']:
-                deadline = datetime.strptime(data['deadline'], "%d %b %Y")
+                # Extract contracting authority type
+                try:
+                    value_element = driver.find_element(By.XPATH, "//span[text()='Contracting authority type:']/following-sibling::span")
+                    contracting_authority_type = value_element.text.strip()
+                    print(f"contracting_authority_type:{contracting_authority_type}")
+                except Exception as e:
+                    contracting_authority_type = None
 
-            # Create Auction entry
-            auction = Auction.objects.create(
-                title=data['title'],
-                description='',  # Description is missing, so you can leave it empty or fill as needed
-                deadline=deadline,
-                url=data['url'],
-                source=data['source'],
-            )
+                # Extract advanced details
+                advanced_details = {}
+                parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                
 
-            # Fetch and save detailed info
-            detailed_info = self.fetch_detailed_info(data['url'])
-            auction_details.objects.create(
-                auction=auction,
-                **detailed_info
-            )
+                # Select the first inner div and fetch the second span
+                first_inner_div = parent_div.find_elements(By.TAG_NAME, "div")[0]  # First div
+                spans = first_inner_div.find_elements(By.TAG_NAME, "span")         # All spans
 
-# Example usage
-url = 'https://www.developmentaid.org/grants/search'  # Base URL
-keyword = 'NGO'
-scraper = DevelopmentAidScraper(url, keyword)
-grants = scraper.fetch_data()
-url = scraper.fetch_data()[1]
-scraper.fetch_detailed_info(url)
-scraper.save_to_database(grants)
+                # Extract the second span's text (status value)
+                if len(spans) > 1:
+                    status = spans[1]
+                    status_text=status.get_attribute('textContent')
+                    print(f"TextContent: {status_text}")
+                else:
+                    print("Status span not found!")
+
+                sleep(5)
+            
+                Budjet_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Budjet_second_div = Budjet_parent_div.find_elements(By.TAG_NAME, "div")[1]
+                Budjet_spans = Budjet_second_div.find_elements(By.TAG_NAME, "span")
+
+                # Print the attributes and innerHTML of the span
+                if len(Budjet_spans) > 1:
+                    Budjet_element = Budjet_spans[1]
+                    Budjet_text=Budjet_element.get_attribute('textContent')
+                    print(f"Budjet TextContent: {Budjet_text}")
+
+                sleep(3)
+            
+                Award_ceiling_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Award_ceiling_div = Award_ceiling_parent_div.find_elements(By.TAG_NAME, "div")[2]
+                Award_ceiling_spans = Award_ceiling_div.find_elements(By.TAG_NAME, "span")
+
+                # Print the attributes and innerHTML of the span
+                if len(Award_ceiling_spans) > 1:
+                    Award_ceiling_element = Award_ceiling_spans[1]
+                    Award_ceiling_text=Award_ceiling_element.get_attribute('textContent')
+                    print(f"Award_ceiling Text: {Award_ceiling_text}")
+
+                sleep(2)
+            
+                Award_floor_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Award_floor_div = Award_floor_parent_div.find_elements(By.TAG_NAME, "div")[3]
+                Award_floor_spans = Award_floor_div.find_elements(By.TAG_NAME, "span")
+
+                # Print the attributes and innerHTML of the span
+                if len(Award_floor_spans) > 1:
+                    Award_floor_element = Award_floor_spans[1]
+                    Award_floor_text=Award_floor_element.get_attribute('textContent')
+                    print(f"Award_floor TextContent: {Award_floor_text}")
+
+                Sector_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Sector_div =Sector_parent_div.find_elements(By.TAG_NAME, "div")[4]
+                Sector_spans = Sector_div.find_elements(By.TAG_NAME, "span")
+                
+                # Print the attributes and innerHTML of the span
+                if len(Sector_spans) > 1:
+                    Sector_element = Sector_spans[1]
+                    sector_text=Sector_element.get_attribute('textContent')
+                    print(f"TextContent: {sector_text}")
+            
+                sleep(4)
+                
+                Languages_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Languages_div =Languages_parent_div.find_elements(By.TAG_NAME, "div")[5]
+                Languages_spans = Languages_div.find_elements(By.TAG_NAME, "span")
+                
+                # Print the attributes and innerHTML of the span
+                if len(Languages_spans) > 1:
+                    Languages_element = Languages_spans[1]
+                    Languages_text=Languages_element.get_attribute('textContent')
+                    print(f"TextContent: {Languages_text}")
+
+                sleep(5)
+
+                Eligible_applicants_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Eligible_applicants_div =Eligible_applicants_parent_div.find_elements(By.TAG_NAME, "div")[6]
+                Eligible_applicants_spans = Eligible_applicants_div.find_elements(By.TAG_NAME, "span")
+                
+                # Print the attributes and innerHTML of the span
+                if len(Eligible_applicants_spans) > 1:
+                    Eligible_applicants_element =Eligible_applicants_spans[1]
+                    Eligible_applicants_text=Eligible_applicants_element.get_attribute('textContent')
+                    print(f"TextContent: {Eligible_applicants_text}")
+
+                sleep(5)
+
+                Eligible_citizenships_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Eligible_citizenships_div =Eligible_citizenships_parent_div.find_elements(By.TAG_NAME, "div")[7]
+                Eligible_citizenships_spans = Eligible_citizenships_div.find_elements(By.TAG_NAME, "span")
+                
+                # Print the attributes and innerHTML of the span
+                if len(Eligible_citizenships_spans) > 1:
+                    Eligible_citizenships_element =Eligible_citizenships_spans[1]
+                    Eligible_citizenships_text=Eligible_citizenships_element.get_attribute('textContent')
+                    print(f"TextContent: {Eligible_citizenships_text}")
+
+                sleep(1)
+
+                Date_posted_parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+                Date_posted_div =Date_posted_parent_div.find_elements(By.TAG_NAME, "div")[8]
+                Date_posted_spans = Date_posted_div.find_elements(By.TAG_NAME, "span")
+                
+                # Print the attributes and innerHTML of the span
+                if len(Date_posted_spans) > 1:
+                    Date_posted_element =Date_posted_spans[1]
+                    EDate_posted_text=Date_posted_element.get_attribute('textContent')
+                    print(f"TextContent: {EDate_posted_text}")
+
+                        
+                    
+                driver.quit()
+    def save_detailed_info_to_database(self, auction_id, details):
+        # Step 4: Save the detailed information to the AuctionDetails model
+        auction = Auction.objects.get(id=auction_id)  # Use auction_id to fetch the specific auction object
+        auction_details.objects.create(
+            auction=auction,
+            **details
+        )
+        print(f"Saved detailed information for auction '{auction.title}'")
+
+
+
+from auction.models import Auction, auction_details
+
+def start_scraping_process():
+    
+    url = 'https://www.developmentaid.org/grants/search' 
+    keyword = 'education'
+
+    scraper = DevelopmentAidScraper(url, keyword)
+    print("Fetching auctions from the main scraper...")
+    scraper.fetch_data()
+
+
+    
+
+    print("Fetching auction details for each auction...")
+    scraper.fetch_auction_detail_scraper(url, keyword)
+
+
+start_scraping_process()
