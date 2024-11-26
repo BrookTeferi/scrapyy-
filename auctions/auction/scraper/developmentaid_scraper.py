@@ -9,13 +9,15 @@ from datetime import datetime
 from auction.models import Auction, auction_details
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 class DevelopmentAidScraper:
    
     def __init__(self, url, keyword):
         self.url = url
         self.keyword = keyword
-
+ 
     def fetch_data(self):
         # Set up Selenium with Chrome options
         chrome_options = Options()
@@ -55,56 +57,88 @@ class DevelopmentAidScraper:
         # Set up Selenium with Chrome options
         chrome_options = Options()
         chrome_options.add_argument("--headless")
+        chrome_options.add_argument('--ignore-certificate-errors')
+        chrome_options.add_argument('--ignore-ssl-errors')
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         url_str = cast(str, detail_url)
         driver.get(url_str)
     
         sleep(5)  # Allow time for page to load
-#         driver.switch_to.frame(driver.find_element(By.TAG_NAME, 'iframe'))
-#         title_element = WebDriverWait(driver, 20).until(
-#     EC.visibility_of_element_located((By.CSS_SELECTOR, 'div.title h1.name span.ng-tns-c199251055-6'))
-# )     
-        status = driver.find_element(By.XPATH, "//span[text()='Status:']/following-sibling::span").text
-        budget = driver.find_element(By.XPATH, "//span[text()='Budget:']/following-sibling::span").text
-        sector = driver.find_element(By.XPATH, "//span[text()='Sector:']/following-sibling::span").text
-        languages = driver.find_element(By.XPATH, "//span[text()='Languages:']/following-sibling::span").text
-        eligible_applicants = driver.find_element(By.XPATH, "//span[text()='Eligible applicants:']/following-sibling::span").text
+       
+        # Extract the text content from each element
+        details_container = driver.find_element(By.CLASS_NAME, "default-details")
+        Location = details_container.find_element(By.CSS_SELECTOR, "span:nth-child(2)").text.strip()
+        print(f'Location:{Location}')
 
-        # Print out the scraped values
-        print("Status:", status)
-        print("Budget:", budget)
-        print("Sector:", sector)
-        print("Languages:", languages)
-        print("Eligible Applicants:", eligible_applicants)
+        funding_agency = driver.find_element(By.CLASS_NAME, "funding-agency")
+        sleep(2)
+        # Step 2: Locate the span inside the div by class name
+        donor_name = funding_agency.find_element(By.CLASS_NAME, "donor-name")
+        sleep(3)
+        # Step 3: Locate the 'a' tag inside the span and extract its text
+        donor_link = donor_name.find_element(By.TAG_NAME, "a")
+        text = donor_link.text
+        sleep(2)
 
+        # Print the extracted text
+        print(f"Funding agency: {text}")
 
+        try:
+            
+            a_tags = driver.find_elements(By.CLASS_NAME, "view-link")
+            sleep(5)
+            # Access the second <a> tag (index 1, since indexing starts from 0)
+            second_a_tag = a_tags[1]  # Ensure there are at least two elements to avoid IndexError
+            sleep(3)
+            Contracting_authority_text = second_a_tag.text.strip()
+            sleep(3)
+            Contracting_authority_link = second_a_tag.get_attribute("href")
+            sleep(4)
 
+            # Print the extracted information
+            print(f"Text: {Contracting_authority_text}")
+            print(f"Link: {Contracting_authority_link}")
+        except Exception as e:
+            print(f"Error: {e}")   
 
-        # # Extract the text
-        # title_text = title_element.text
-        # print(title_text)
-        #         # Extract details from the grant page
-        # detailed_data = {
-        #     'title': driver.find_element(By.CSS_SELECTOR, 'div.title h1.name span.ng-tns-c199251055-6').text,
-        #     'description': driver.find_element(By.CSS_SELECTOR, 'selector-for-description').text,
-        #     'Location': driver.find_element(By.CSS_SELECTOR, 'selector-for-location').text,
-        #     'Funding_agency': driver.find_element(By.CSS_SELECTOR, 'selector-for-funding-agency').text,
-        #     'Contracting_authority': driver.find_element(By.CSS_SELECTOR, 'selector-for-contracting-authority').text,
-        #     'type': driver.find_element(By.CSS_SELECTOR, 'selector-for-type').text,
-        #     'Status': driver.find_element(By.CSS_SELECTOR, 'selector-for-status').text,
-        #     'Budget': driver.find_element(By.CSS_SELECTOR, 'selector-for-budget').text,
-        #     'Award_ceiling': driver.find_element(By.CSS_SELECTOR, 'selector-for-award-ceiling').text,
-        #     'Award_floor': driver.find_element(By.CSS_SELECTOR, 'selector-for-award-floor').text,
-        #     'Sector': driver.find_element(By.CSS_SELECTOR, 'selector-for-sector').text,
-        #     'Languages': driver.find_element(By.CSS_SELECTOR, 'selector-for-languages').text,
-        #     'Eligible_applicants': driver.find_element(By.CSS_SELECTOR, 'selector-for-eligible-applicants').text,
-        #     'Eligible_citizenship': driver.find_element(By.CSS_SELECTOR, 'selector-for-eligible-citizenship').text,
-        #     'Dateposted': datetime.strptime(
-        #         driver.find_element(By.CSS_SELECTOR, 'selector-for-dateposted').text, "%d %b %Y"
-        #     )
-        # }
+        try:
+            value_element = driver.find_element(By.XPATH, "//span[text()='Contracting authority type:']/following-sibling::span")
 
-        # print(detailed_data)
+            # Extract the text content
+            contracting_authority_type = value_element.text.strip()
+
+            # Print the result
+            print(f"Value: {contracting_authority_type}")
+        except Exception as e:
+            print(f"Error: {e}")
+        sleep(5)
+            # Locate the advanced-details div
+        parent_div = driver.find_element(By.CLASS_NAME, "advanced-details")
+
+        # List of labels for the elements to extract
+        labels = [
+            "Status", "Budjet", "Award Ceiling", "Award Floor", 
+            "Sector", "Languages", "Eligible Applicants", 
+            "Eligible Citizenships", "Date Posted"
+        ]
+
+        # Loop through the child divs and fetch the second span's text
+        for index, label in enumerate(labels):
+            try:
+                inner_div = parent_div.find_elements(By.TAG_NAME, "div")[index]
+                spans = inner_div.find_elements(By.TAG_NAME, "span")
+                if len(spans) > 1:
+                    text = spans[1].get_attribute('textContent')
+                    print(f"{label} TextContent: {text}")
+                else:
+                    print(f"{label}: Span not found!")
+            except Exception as e:
+                print(f"Error processing {label}: {str(e)}")
+            
+            # Add sleep only if necessary, based on real-world requirements
+            sleep(2)
+
+                
         driver.quit()
         # return detailed_data
 
@@ -133,9 +167,9 @@ class DevelopmentAidScraper:
 
 # Example usage
 url = 'https://www.developmentaid.org/grants/search'  # Base URL
-keyword = 'education'  # Define your keyword
+keyword = 'NGO'
 scraper = DevelopmentAidScraper(url, keyword)
 grants = scraper.fetch_data()
-url = scraper.fetch_data()[1]  # Assuming fetch_data returns a tuple with the last URL
+url = scraper.fetch_data()[1]
 scraper.fetch_detailed_info(url)
 scraper.save_to_database(grants)
