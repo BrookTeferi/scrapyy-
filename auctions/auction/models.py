@@ -8,13 +8,6 @@ class Auction(models.Model):
     source = models.CharField(max_length=100)
     image_path = models.CharField(max_length=255, null=True, blank=True)
     scraped_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.title
-
-class auction_details(models.Model):
-    auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     Location = models.TextField(null=True, blank=True)
     Funding_agency= models.TextField(null=True, blank=True)
@@ -31,10 +24,7 @@ class auction_details(models.Model):
     Eligible_citizenship= models.TextField(null=True, blank=True)
     Dateposted= models.DateTimeField(null=True, blank=True)
   
-class Attachment(models.Model):
-    auction = models.ForeignKey(Auction, related_name="attachments", on_delete=models.CASCADE)
-    file = models.FileField(upload_to="attachments/")
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+
 class UserPreference(models.Model):
     keyword = models.CharField(max_length=100)
     user = models.ForeignKey(User, on_delete=models.CASCADE)

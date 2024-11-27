@@ -1,10 +1,8 @@
-# Python
 __pycache__/
 *.pyc
 *.pyo
 venv/
 *.sqlite3
-
 downloaded_images
 
 # Environment files
