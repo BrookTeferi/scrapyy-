@@ -45,7 +45,6 @@ class DevelopmentAidScraper:
                 title, deadline, url, image_url = grant_info
                 image_element = driver.find_element(By.CSS_SELECTOR, "div.search-card__avatar img")
                 image_path = image_element.get_attribute("src")
-                print("Image URL:", image_url)
                 self.fetch_auction_detail_scraper(url, title, deadline, image_path)
 
                 auction_count += 1  # Increment the counter
@@ -245,23 +244,6 @@ class DevelopmentAidScraper:
                       
                     except ValueError as e:
                         posted_date = None
-
-
-
-                print("\n================================")
-                print(f"Location:{location}")
-                print(f"Funding_agency:{donor_link}")
-
-
-                print(f"Budjet_text:{Budjet_text}")
-                print(f"Award_ceiling_text:{Award_ceiling_text}")
-                print(f"Award_floor_text:{Award_floor_text}")
-                print(f"sector_text:{sector_text}")
-                print(f"Languages_text:{Languages_text}")
-                print(f"Eligible_applicants_text:{Eligible_applicants_text}")
-                print(f"Eligible_citizenships_text:{Eligible_citizenships_text}")
-                print(f"EDate_posted_text:{posted_date}")
-
 
                 randome_time=int(random.randint(0, 20))
                 sleep(randome_time)
