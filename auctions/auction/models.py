@@ -24,6 +24,14 @@ class Auction(models.Model):
     Eligible_citizenship= models.TextField(null=True, blank=True)
     Dateposted= models.DateTimeField(null=True, blank=True)
   
+class  Organization(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    email=models.EmailField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)  # Sets the field value to the current timestamp when a record is created
+    updated_at = models.DateTimeField(auto_now=True)  # 
+
+
 
 class UserPreference(models.Model):
     keyword = models.CharField(max_length=100)
