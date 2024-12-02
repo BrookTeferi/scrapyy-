@@ -295,4 +295,4 @@ def start_scraping_process():
     print("Fetching auctions from the main scraper...")
     scraper.fetch_data()
 
-start_scraping_process()
+# start_scraping_process()

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auction Site Scraping Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-purple-100 to-indigo-200 p-8">
+    <div class="max-w-6xl mx-auto" x-data="scrapingApp()">
+        <!-- Logo Section -->
+        <div class="flex justify-center mb-8">
+            <img class="w-36 h-46 text-indigo-600"
+                src="https://www.unwater.org/sites/default/files/styles/social_large/public/app/uploads/2020/06/220x120_PARTNERS_WATERAID_newnov2019.png?h=1d6c82cd&itok=pMf8omFM"
+                alt="" srcset="">
+        </div>
+
+        <h1 class="text-4xl font-bold text-center text-indigo-900 mb-8">Auction Site Scraping Tool</h1>
+
+        <!-- Tabs -->
+        <div class="mb-4">
+            <div class="flex border-b border-gray-200">
+                <button @click="activeTab = 'profiles'"
+                    :class="{'text-indigo-600 border-b-2 border-indigo-600 font-semibold': activeTab === 'profiles', 'text-gray-600 hover:text-indigo-600': activeTab !== 'profiles'}"
+                    class="py-2 px-4">
+                    Profiles
+                </button>
+                <button @click="activeTab = 'scrapedData'"
+                    :class="{'text-indigo-600 border-b-2 border-indigo-600 font-semibold': activeTab === 'scrapedData', 'text-gray-600 hover:text-indigo-600': activeTab !== 'scrapedData'}"
+                    class="py-2 px-4">
+                    Scraped Data
+                </button>
+                <button @click="activeTab = 'sites'"
+                    :class="{'text-indigo-600 border-b-2 border-indigo-600 font-semibold': activeTab === 'sites', 'text-gray-600 hover:text-indigo-600': activeTab !== 'sites'}"
+                    class="py-2 px-4">
+                    Available Sites
+                </button>
+            </div>
+        </div>
+
+        <!-- Profile Tab Content -->
+        <div x-show="activeTab === 'profiles'" class="bg-white rounded-lg shadow-xl p-6 mb-8">
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Registration Form -->
+                <div class="space-y-6">
+                    <h2 class="text-2xl font-semibold text-indigo-900 mb-4">Register Scraping Profile</h2>
+                    <form @submit.prevent="registerProfile" class="space-y-4">
+                        <div>
+                            <label for="min-budget" class="block text-sm font-medium text-gray-700 mb-1">Minimum
+                                Budget</label>
+                            <input id="min-budget" type="number" x-model="newProfile.minBudget"
+                                placeholder="Enter minimum budget"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                required>
+                        </div>
+                        <div>
+                            <label for="fund-source" class="block text-sm font-medium text-gray-700 mb-1">Fund
+                                Source</label>
+                            <input id="fund-source" type="text" x-model="newProfile.fundSource"
+                                placeholder="Enter fund source"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                required>
+                        </div>
+                        <div>
+                            <label for="location"
+                                class="block text-sm font-medium text-gray-700 mb-1">Location/Country</label>
+                            <input id="location" type="text" x-model="newProfile.location"
+                                placeholder="Enter location or country"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                required>
+                        </div>
+                        <div>
+                            <label for="sector" class="block text-sm font-medium text-gray-700 mb-1">Sector</label>
+                            <select id="sector" x-model="newProfile.sector"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                required>
+                                <option value="">Select a sector</option>
+                                <option value="technology">Technology</option>
+                                <option value="finance">Finance</option>
+                                <option value="healthcare">Healthcare</option>
+                                <option value="education">Education</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <button type="submit"
+                            class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition duration-300">Register
+                            Profile</button>
+                    </form>
+                </div>
+
+                <!-- Registered Profiles -->
+                <div>
+                    <h2 class="text-2xl font-semibold text-indigo-900 mb-4">Registered Profiles</h2>
+                    <div class="space-y-4">
+                        <template x-for="(profile, index) in registeredProfiles" :key="index">
+                            <div
+                                class="bg-indigo-50 p-4 rounded-lg border border-indigo-100 transition duration-300 hover:shadow-md">
+                                <h3 class="font-semibold text-indigo-900 mb-2" x-text="'Profile ' + (index + 1)"></h3>
+                                <p class="text-sm text-gray-600" x-text="'Min Budget: $' + profile.minBudget"></p>
+                                <p class="text-sm text-gray-600" x-text="'Fund Source: ' + profile.fundSource"></p>
+                                <p class="text-sm text-gray-600" x-text="'Location: ' + profile.location"></p>
+                                <p class="text-sm text-gray-600" x-text="'Sector: ' + profile.sector"></p>
+                                <div class="mt-2 flex justify-between items-center">
+                                    <span class="text-sm font-medium text-indigo-600"
+                                        x-text="'Matching Auctions: ' + profile.matchingAuctions"></span>
+                                    <button @click="viewMatchingAuctions(index)"
+                                        class="text-sm text-white bg-indigo-500 px-2 py-1 rounded hover:bg-indigo-600 transition duration-300">View
+                                        Matches</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scraped Data Tab Content -->
+        <div x-show="activeTab === 'scrapedData'" class="bg-white rounded-lg shadow-xl p-6">
+            <h2 class="text-2xl font-semibold text-indigo-900 mb-4">Scraped Data</h2>
+
+            <!-- Search Bar -->
+            <div class="mb-4 flex space-x-2">
+                <input type="text" x-model="searchQuery" placeholder="Search scraped data..."
+                    class="flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button @click="searchData"
+                    class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition duration-300">Search</button>
+            </div>
+
+            <!-- Data Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Item Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Current Bid</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Location</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Sector</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                End Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="(item, index) in filteredScrapedData" :key="index">
+                            <tr :class="index % 2 === 0 ? 'bg-gray-50' : 'bg-white'">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"
+                                    x-text="item.name"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="'$' + item.bid">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="item.location">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="item.sector"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="item.endDate">
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sites Tab Content -->
+        <div x-show="activeTab === 'sites'" class="bg-white rounded-lg shadow-xl p-6">
+            <h2 class="text-2xl font-semibold text-indigo-900 mb-4">Scraping Sites</h2>
+            <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <template x-for="(site, index) in sites" :key="index">
+                    <div
+                        class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition duration-300">
+                        <div class="p-5">
+                            <h3 class="text-xl font-semibold mb-2" x-text="site.name"></h3>
+                            <p class="text-gray-600 mb-4" x-text="site.url"></p>
+                            <div class="space-y-2 text-sm">
+                                <p><span class="font-medium">Last Scraped:</span> <span
+                                        x-text="site.lastScraped"></span></p>
+                                <p><span class="font-medium">Next Scheduled:</span> <span
+                                        x-text="site.nextScheduled"></span></p>
+                                <p><span class="font-medium">Total Auctions:</span> <span
+                                        x-text="site.totalAuctions"></span></p>
+                                <p><span class="font-medium">Status:</span> <span
+                                        :class="{'text-green-600': site.status === 'Active', 'text-red-600': site.status === 'Inactive'}"
+                                        x-text="site.status"></span></p>
+                            </div>
+                            <div class="mt-4 flex justify-between items-center">
+                                <a href="/scrape"
+                                    class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition duration-300">Run
+                                    Scraping</a>
+                                <button @click="viewSiteDetails(index)"
+                                    class="text-indigo-600 hover:text-indigo-800 transition duration-300">View
+                                    Details</button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function scrapingApp() {
+            return {
+                activeTab: 'profiles',
+                newProfile: {
+                    minBudget: '',
+                    fundSource: '',
+                    location: '',
+                    sector: ''
+                },
+                registeredProfiles: [{
+                        minBudget: 1000,
+                        fundSource: 'Private',
+                        location: 'New York, USA',
+                        sector: 'Technology',
+                        matchingAuctions: 5
+                    },
+                    {
+                        minBudget: 500,
+                        fundSource: 'Corporate',
+                        location: 'London, UK',
+                        sector: 'Finance',
+                        matchingAuctions: 3
+                    }
+                ],
+                scrapedData: [{
+                        name: "Vintage Camera",
+                        bid: 150,
+                        location: "New York, USA",
+                        sector: "Collectibles",
+                        endDate: "2023-07-15"
+                    },
+                    {
+                        name: "Laptop Computer",
+                        bid: 500,
+                        location: "London, UK",
+                        sector: "Technology",
+                        endDate: "2023-07-18"
+                    },
+                    {
+                        name: "Antique Desk",
+                        bid: 300,
+                        location: "Paris, France",
+                        sector: "Furniture",
+                        endDate: "2023-07-20"
+                    },
+                    {
+                        name: "Smartphone",
+                        bid: 200,
+                        location: "Tokyo, Japan",
+                        sector: "Technology",
+                        endDate: "2023-07-22"
+                    },
+                    {
+                        name: "Oil Painting",
+                        bid: 1000,
+                        location: "Rome, Italy",
+                        sector: "Art",
+                        endDate: "2023-07-25"
+                    }
+                ],
+                sites: [{
+                        name: "AuctionMaster",
+                        url: "https://auctionmaster.com",
+                        lastScraped: "2023-07-01",
+                        nextScheduled: "2023-07-08",
+                        totalAuctions: 1250,
+                        status: "Active"
+                    },
+                    {
+                        name: "BidBuddies",
+                        url: "https://bidbuddies.com",
+                        lastScraped: "2023-07-03",
+                        nextScheduled: "2023-07-10",
+                        totalAuctions: 980,
+                        status: "Active"
+                    },
+                    {
+                        name: "CollectorsCorner",
+                        url: "https://collectorscorner.com",
+                        lastScraped: "2023-06-30",
+                        nextScheduled: "2023-07-07",
+                        totalAuctions: 750,
+                        status: "Inactive"
+                    }
+                ],
+                searchQuery: '',
+                registerProfile() {
+                    this.newProfile.matchingAuctions = Math.floor(Math.random() * 10);
+                    this.registeredProfiles.push({
+                        ...this.newProfile
+                    });
+                    this.newProfile = {
+                        minBudget: '',
+                        fundSource: '',
+                        location: '',
+                        sector: ''
+                    };
+                },
+                get filteredScrapedData() {
+                    return this.scrapedData.filter(item =>
+                        item.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                        item.location.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                        item.sector.toLowerCase().includes(this.searchQuery.toLowerCase())
+                    );
+                },
+                searchData() {
+                    // The filtering is done automatically by the computed property
+                },
+                viewMatchingAuctions(index) {
+                    alert(`Viewing matching auctions for Profile ${index + 1}`);
+                    // Implement the logic to show matching auctions
+                },
+                runScraping(index) {
+                    alert(`Running scraping for ${this.sites[index].name}`);
+                    // Implement the logic to run scraping
+                },
+                viewSiteDetails(index) {
+                    alert(`Viewing details for ${this.sites[index].name}`);
+                    // Implement the logic to show site details
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

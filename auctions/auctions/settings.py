@@ -77,16 +77,15 @@ WSGI_APPLICATION = 'auctions.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': config('DB_ENGINE'),
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT'),
+        'ENGINE': config('DB_ENGINE', 'django.db.backends.postgresql'),
+        'NAME': config('DB_NAME', 'wateraid'),
+        'USER': config('DB_USER','postgres'),
+        'PASSWORD': config('DB_PASSWORD', '9Z6e13r7T8y'),
+        'HOST': config('DB_HOST', '192.168.0.137'),
+        'PORT': config('DB_PORT', '5432'),
 
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
