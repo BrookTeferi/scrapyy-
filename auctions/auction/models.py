@@ -3,23 +3,17 @@ from django.contrib.auth.models import User
 
 class Auction(models.Model):
     title = models.CharField(max_length=255)
-    description = models.TextField()
     deadline = deadline = models.DateTimeField(null=True, blank=True)
     url = models.URLField()
     source = models.CharField(max_length=100)
+    image_path = models.CharField(max_length=255, null=True, blank=True)
     scraped_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.title
-
-class auction_details(models.Model):
-    auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     Location = models.TextField(null=True, blank=True)
     Funding_agency= models.TextField(null=True, blank=True)
-    Contracting_authority = models.JSONField(null=True, blank=True)
-    type= models.TextField(null=True, blank=True)
+    contracting_authority_text = models.CharField(max_length=255, null=True, blank=True)
+    contracting_authority_link = models.URLField(null=True, blank=True)
+    contracting_authority_type= models.TextField(null=True, blank=True)
     Status= models.TextField(null=True, blank=True)
     Budget= models.TextField(null=True, blank=True)
     Award_ceiling= models.TextField(null=True, blank=True)
@@ -30,10 +24,15 @@ class auction_details(models.Model):
     Eligible_citizenship= models.TextField(null=True, blank=True)
     Dateposted= models.DateTimeField(null=True, blank=True)
   
-class Attachment(models.Model):
-    auction = models.ForeignKey(Auction, related_name="attachments", on_delete=models.CASCADE)
-    file = models.FileField(upload_to="attachments/")
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+class  Organization(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    email=models.EmailField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)  # Sets the field value to the current timestamp when a record is created
+    updated_at = models.DateTimeField(auto_now=True)  # 
+
+
+
 class UserPreference(models.Model):
     keyword = models.CharField(max_length=100)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
